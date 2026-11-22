@@ -553,6 +553,8 @@
         ttq.track(
           "Contact",
           {
+            content_type: "product",
+            content_id: "glamour_beauty_contact",
             source: "Page_Scroll",
             ...userData
           },
@@ -577,7 +579,7 @@
     window.addEventListener("touchmove", triggerScrollContact, { passive: true });
     window.addEventListener("wheel", triggerScrollContact, { passive: true });
 
-    // 2. تسجيل حدث InitiateCheckout مع تأخير 150ms لضمان وصول الإشارة قبل فتح واتساب
+    // 2. تسجيل حدث InitiateCheckout بدون تحذير أصفر مع تأخير 150ms قبل فتح واتساب
     function handleWhatsAppClick(e, buttonElement, buttonSource) {
       e.preventDefault();
 
@@ -589,6 +591,19 @@
         ttq.track(
           "InitiateCheckout",
           {
+            content_type: "product",
+            content_id: "glamour_beauty_offer",
+            contents: [
+              {
+                content_id: "glamour_beauty_offer",
+                content_type: "product",
+                content_name: "Glamour Beauty WhatsApp Order",
+                quantity: 1,
+                price: 1
+              }
+            ],
+            value: 1,
+            currency: "USD",
             source: buttonSource,
             ...userData
           },
