@@ -467,54 +467,44 @@
     // جدول المسوقين: الرمز المختصر (في الرابط) + أرقام هواتفهم الحقيقية
     // ==========================================================
     const marketers = {
-        "as": "972567845326",   // أسماء (asmaa)
-        "so": "970567031881",   // سوما (soma)
-        "de": "972567341418"    // ضياء (deyaa)
+      "as": "972567845326",   // أسماء (asmaa)
+      "so": "970567031881",   // سوما (soma)
+      "de": "972567341418"    // ضياء (deyaa)
     };
 
     // الرقم الافتراضي الخاص بك (في حال دخل الزبون مباشرة بدون رابط مسوق)
     const defaultPhone = "972567938099";
 
-    window.addEventListener('DOMContentLoaded', () => {
-        // قراءة كود المسوق من الرابط (مثلاً: ?ref=as أو ?ref=so أو ?ref=de)
-        const urlParams = new URLSearchParams(window.location.search);
-        const marketerCode = urlParams.get('ref');
-
-        let targetPhone = defaultPhone;
-        let displayCode = "";
-
-        // التحقق من أن الكود مسجل في القائمة
-        if (marketerCode && marketers[marketerCode]) {
-            targetPhone = marketers[marketerCode];
-            displayCode = `(${marketerCode})`; // وضع الرمز المختصر بين قوسين في نهاية الرسالة
-        }
-
-        // تنظيف الرقم من أي رموز أو مسافات زائدة
-        const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
-
-        // بناء الرسالة التسويقية الموحدة مع الرمز المختصر في نهايتها
-        const rawMessage = `مرحبًا، شاهدت إعلانكم على TikTok وأود معرفة المزيد. ${displayCode}`.trim();
-        const encodedMessage = encodeURIComponent(rawMessage);
-
-        // تحديث روابط زري الواتساب في الصفحة ديناميكياً
-        const whatsappButton = document.getElementById("whatsappButton");
-        const centerWhatsappButton = document.getElementById("centerWhatsappButton");
-
-        const finalWhatsAppUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
-
-        if (whatsappButton) {
-            whatsappButton.href = finalWhatsAppUrl;
-        }
-        if (centerWhatsappButton) {
-            centerWhatsappButton.href = finalWhatsAppUrl;
-        }
-    });
-
     const whatsappButton = document.getElementById("whatsappButton");
     const centerWhatsappButton = document.getElementById("centerWhatsappButton");
 
+    window.addEventListener("DOMContentLoaded", () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const marketerCode = urlParams.get("ref");
+
+      let targetPhone = defaultPhone;
+      let displayCode = "";
+
+      if (marketerCode && marketers[marketerCode]) {
+        targetPhone = marketers[marketerCode];
+        displayCode = `(${marketerCode})`;
+      }
+
+      const cleanPhone = targetPhone.replace(/[^0-9]/g, "");
+      const rawMessage = `مرحبًا، شاهدت إعلانكم على TikTok وأود معرفة المزيد. ${displayCode}`.trim();
+      const encodedMessage = encodeURIComponent(rawMessage);
+      const finalWhatsAppUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+
+      if (whatsappButton) {
+        whatsappButton.href = finalWhatsAppUrl;
+      }
+      if (centerWhatsappButton) {
+        centerWhatsappButton.href = finalWhatsAppUrl;
+      }
+    });
+
     function generateEventId() {
-      return "event_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+      return "event_" + Date.now() + "_" + Math.random().toString(36).substring(2, 11);
     }
 
     function getTTCLID() {
@@ -549,11 +539,14 @@
       return user;
     }
 
-    // حدث Contact منفصل عند التمرير على الصفحة
+    // 1. مؤقت ذكي لحدث Contact (يعمل بعد 2.5 ثانية أو عند التمرير/اللمس، ويُلغى إذا ضغط الزائر على واتساب فوراً)
     let contactFired = false;
-    function handleScrollContact() {
+    let contactTimer = null;
+
+    function fireContactEvent() {
       if (contactFired) return;
       contactFired = true;
+      if (contactTimer) clearTimeout(contactTimer);
 
       const eventIdContact = generateEventId();
       const userData = getTikTokUserData();
@@ -561,7 +554,9 @@
       if (window.ttq) {
         ttq.track(
           "Contact",
-          Object.assign({}, userData),
+          {
+            ...userData
+          },
           {
             event_id: eventIdContact
           }
@@ -569,55 +564,76 @@
       }
 
       window.removeEventListener("scroll", onScrollTrigger);
-      window.removeEventListener("touchmove", handleScrollContact);
-      window.removeEventListener("wheel", handleScrollContact);
+      window.removeEventListener("touchmove", fireContactEvent);
+      window.removeEventListener("wheel", fireContactEvent);
     }
 
     function onScrollTrigger() {
       if (window.scrollY > 5) {
-        handleScrollContact();
+        fireContactEvent();
       }
     }
 
-    window.addEventListener("scroll", onScrollTrigger, { passive: true });
-    window.addEventListener("touchmove", handleScrollContact, { passive: true });
-    window.addEventListener("wheel", handleScrollContact, { passive: true });
+    contactTimer = setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        fireContactEvent();
+      }
+    }, 2500);
 
-    // حدث InitiateCheckout عند الضغط على الزر الأوسط أو السفلي
-    function handleWhatsAppClick(e) {
+    window.addEventListener("scroll", onScrollTrigger, { passive: true });
+    window.addEventListener("touchmove", fireContactEvent, { passive: true });
+    window.addEventListener("wheel", fireContactEvent, { passive: true });
+
+    // 2. حدث InitiateCheckout عند الضغط على الزر الأوسط أو السفلي (مع إزالة التحذير الأصفر وضمان وصول الإشارة)
+    function handleWhatsAppClick(e, buttonElement, buttonSource) {
+      e.preventDefault();
+
+      // إلغاء مؤقت Contact إذا ضغط الزائر فوراً قبل مرور 2.5 ثانية
+      if (!contactFired && contactTimer) {
+        clearTimeout(contactTimer);
+        contactFired = true;
+      }
+
+      const targetUrl = buttonElement.href;
       const eventIdInitiateCheckout = generateEventId();
       const userData = getTikTokUserData();
 
       if (window.ttq) {
         ttq.track(
           "InitiateCheckout",
-          Object.assign(
-            {
-              contents: [
-                {
-                  content_id: "glamour_beauty_offer",
-                  content_type: "product"
-                }
-              ],
-              value: 1,
-              currency: "USD",
-              source: "WhatsApp_Button",
-              ...userData
-            }
-          ),
+          {
+            contents: [
+              {
+                content_id: "glamour_beauty_offer",
+                content_type: "product"
+              }
+            ],
+            value: 1,
+            currency: "USD",
+            source: buttonSource,
+            ...userData
+          },
           {
             event_id: eventIdInitiateCheckout
           }
         );
       }
+
+      setTimeout(() => {
+        window.open(targetUrl, "_blank", "noopener,noreferrer");
+      }, 150);
     }
 
     if (centerWhatsappButton) {
-      centerWhatsappButton.addEventListener("click", handleWhatsAppClick);
+      centerWhatsappButton.addEventListener("click", function(e) {
+        handleWhatsAppClick(e, centerWhatsappButton, "Center_WhatsApp_Button");
+      });
     }
 
     if (whatsappButton) {
-      whatsappButton.addEventListener("click", handleWhatsAppClick);
+      whatsappButton.addEventListener("click", function(e) {
+        handleWhatsAppClick(e, whatsappButton, "Bottom_WhatsApp_Button");
+      });
     }
   </script>
 
