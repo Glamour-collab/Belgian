@@ -593,6 +593,14 @@
           "InitiateCheckout",
           Object.assign(
             {
+              contents: [
+                {
+                  content_id: "glamour_beauty_offer",
+                  content_type: "product"
+                }
+              ],
+              value: 1,
+              currency: "USD",
               source: "WhatsApp_Button",
               ...userData
             }
