@@ -539,14 +539,12 @@
       return user;
     }
 
-    // 1. مؤقت ذكي لحدث Contact (يعمل بعد 2.5 ثانية أو عند التمرير/اللمس، ويُلغى إذا ضغط الزائر على واتساب فوراً)
+    // 1. تسجيل حدث Contact حصراً عند اللمس أو التمرير (مرة واحدة فقط)
     let contactFired = false;
-    let contactTimer = null;
 
     function fireContactEvent() {
       if (contactFired) return;
       contactFired = true;
-      if (contactTimer) clearTimeout(contactTimer);
 
       const eventIdContact = generateEventId();
       const userData = getTikTokUserData();
@@ -563,36 +561,20 @@
         );
       }
 
-      window.removeEventListener("scroll", onScrollTrigger);
+      window.removeEventListener("scroll", fireContactEvent);
+      window.removeEventListener("touchstart", fireContactEvent);
       window.removeEventListener("touchmove", fireContactEvent);
       window.removeEventListener("wheel", fireContactEvent);
     }
 
-    function onScrollTrigger() {
-      if (window.scrollY > 5) {
-        fireContactEvent();
-      }
-    }
-
-    contactTimer = setTimeout(() => {
-      if (document.visibilityState === "visible") {
-        fireContactEvent();
-      }
-    }, 2500);
-
-    window.addEventListener("scroll", onScrollTrigger, { passive: true });
+    window.addEventListener("scroll", fireContactEvent, { passive: true });
+    window.addEventListener("touchstart", fireContactEvent, { passive: true });
     window.addEventListener("touchmove", fireContactEvent, { passive: true });
     window.addEventListener("wheel", fireContactEvent, { passive: true });
 
-    // 2. حدث InitiateCheckout عند الضغط على الزر الأوسط أو السفلي (مع إزالة التحذير الأصفر وضمان وصول الإشارة)
+    // 2. تسجيل حدث InitiateCheckout عند الضغط على الزر الأوسط أو السفلي
     function handleWhatsAppClick(e, buttonElement, buttonSource) {
       e.preventDefault();
-
-      // إلغاء مؤقت Contact إذا ضغط الزائر فوراً قبل مرور 2.5 ثانية
-      if (!contactFired && contactTimer) {
-        clearTimeout(contactTimer);
-        contactFired = true;
-      }
 
       const targetUrl = buttonElement.href;
       const eventIdInitiateCheckout = generateEventId();
