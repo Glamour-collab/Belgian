@@ -515,7 +515,7 @@
           localStorage.setItem("tiktok_ttclid", ttclid);
           return ttclid;
         }
-        return localStorage.setItem ? (localStorage.getItem("tiktok_ttclid") || null) : null;
+        return localStorage.getItem("tiktok_ttclid") || null;
       } catch (error) {
         return null;
       }
