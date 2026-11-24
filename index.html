@@ -539,6 +539,17 @@
       return user;
     }
 
+    function navigateToWhatsApp(targetUrl) {
+      try {
+        const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          window.location.href = targetUrl;
+        }
+      } catch (err) {
+        window.location.href = targetUrl;
+      }
+    }
+
     // الهدف الرئيسي للحملة: InitiateCheckout
     // حدث Contact مرتبط معه لقياس النقرات على الزرين فقط
     function handleWhatsAppClick(e, buttonElement, buttonSource) {
@@ -546,11 +557,13 @@
 
       const targetUrl = buttonElement.href;
       const userData = getTikTokUserData();
+      let didTrack = false;
 
-      if (window.ttq) {
-        // 1. الحدث الأساسي لتحسين الحملة (Optimization Event)
+      if (window.ttq && typeof window.ttq.track === "function") {
+        didTrack = true;
+
         const eventIdInitiateCheckout = generateEventId();
-        ttq.track(
+        window.ttq.track(
           "InitiateCheckout",
           {
             contents: [
@@ -569,9 +582,8 @@
           }
         );
 
-        // 2. حدث Contact لقياس النقرات على الزرين فقط
         const eventIdContact = generateEventId();
-        ttq.track(
+        window.ttq.track(
           "Contact",
           {
             source: buttonSource,
@@ -584,8 +596,8 @@
       }
 
       setTimeout(() => {
-        window.open(targetUrl, "_blank", "noopener,noreferrer");
-      }, 150);
+        navigateToWhatsApp(targetUrl);
+      }, didTrack ? 400 : 50);
     }
 
     if (centerWhatsappButton) {
