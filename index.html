@@ -14,7 +14,7 @@
   <script>
   !function (w, d, t) {
     w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
-    var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
+    var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
     ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
 
     ttq.load('DBORA73C77U0SUQ3RGEG');
@@ -466,13 +466,14 @@
     // ==========================================================
     // جدول المسوقين: الرمز المختصر (في الرابط) + أرقام هواتفهم الحقيقية
     // ==========================================================
+
     const marketers = {
       "as": "972567845326",   // أسماء (asmaa)
       "so": "970567031881",   // سوما (soma)
       "de": "972567341418"    // ضياء (deyaa)
     };
 
-    // الرقم الافتراضي الخاص بك (في حال دخل الزبون مباشرة بدون رابط مسوق)
+    // الرقم الافتراضي الخاص بك
     const defaultPhone = "972567938099";
 
     const whatsappButton = document.getElementById("whatsappButton");
@@ -498,23 +499,31 @@
       if (whatsappButton) {
         whatsappButton.href = finalWhatsAppUrl;
       }
+
       if (centerWhatsappButton) {
         centerWhatsappButton.href = finalWhatsAppUrl;
       }
     });
 
+    // ==========================================================
+    // TikTok Event Tracking
+    // ==========================================================
+
     function generateEventId() {
-      return "event_" + Date.now() + "_" + Math.random().toString(36).substring(2, 11);
+      return "event_" + Date.now() + "_" +
+        Math.random().toString(36).substring(2, 11);
     }
 
     function getTTCLID() {
       try {
         const params = new URLSearchParams(window.location.search);
         const ttclid = params.get("ttclid");
+
         if (ttclid) {
           localStorage.setItem("tiktok_ttclid", ttclid);
           return ttclid;
         }
+
         return localStorage.getItem("tiktok_ttclid") || null;
       } catch (error) {
         return null;
@@ -534,36 +543,47 @@
       const user = {};
       const ttclid = getTTCLID();
       const ttp = getTTP();
+
       if (ttclid) user.ttclid = ttclid;
       if (ttp) user.ttp = ttp;
+
       return user;
     }
 
-    function navigateToWhatsApp(targetUrl) {
-      try {
-        const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
-        if (!opened) {
-          window.location.href = targetUrl;
-        }
-      } catch (err) {
-        window.location.href = targetUrl;
-      }
-    }
+    // ==========================================================
+    // تسجيل الحدثين معاً عند النقر على أي زر واتساب
+    // Contact + InitiateCheckout
+    // ==========================================================
 
-    // الهدف الرئيسي للحملة: InitiateCheckout
-    // حدث Contact مرتبط معه لقياس النقرات على الزرين فقط
     function handleWhatsAppClick(e, buttonElement, buttonSource) {
       e.preventDefault();
 
       const targetUrl = buttonElement.href;
       const userData = getTikTokUserData();
-      let didTrack = false;
 
-      if (window.ttq && typeof window.ttq.track === "function") {
-        didTrack = true;
+      // معرّف مستقل لحدث Contact
+      const eventIdContact = generateEventId();
 
-        const eventIdInitiateCheckout = generateEventId();
-        window.ttq.track(
+      // معرّف مستقل لحدث InitiateCheckout
+      const eventIdInitiateCheckout = generateEventId();
+
+      if (window.ttq) {
+
+        // الحدث الأول: Contact لقياس نقرات واتساب
+        ttq.track(
+          "Contact",
+          {
+            source: buttonSource,
+            ...userData
+          },
+          {
+            event_id: eventIdContact
+          }
+        );
+
+        // الحدث الثاني: InitiateCheckout
+        // يبقى كما هو هدف تحسين الحملة
+        ttq.track(
           "InitiateCheckout",
           {
             contents: [
@@ -581,36 +601,42 @@
             event_id: eventIdInitiateCheckout
           }
         );
-
-        const eventIdContact = generateEventId();
-        window.ttq.track(
-          "Contact",
-          {
-            source: buttonSource,
-            ...userData
-          },
-          {
-            event_id: eventIdContact
-          }
-        );
       }
 
+      // الانتقال إلى واتساب
       setTimeout(() => {
-        navigateToWhatsApp(targetUrl);
-      }, didTrack ? 400 : 50);
+        window.open(targetUrl, "_blank", "noopener,noreferrer");
+      }, 150);
     }
+
+    // ==========================================================
+    // الزر الأوسط
+    // ==========================================================
 
     if (centerWhatsappButton) {
       centerWhatsappButton.addEventListener("click", function(e) {
-        handleWhatsAppClick(e, centerWhatsappButton, "Center_WhatsApp_Button");
+        handleWhatsAppClick(
+          e,
+          centerWhatsappButton,
+          "Center_WhatsApp_Button"
+        );
       });
     }
 
+    // ==========================================================
+    // الزر السفلي
+    // ==========================================================
+
     if (whatsappButton) {
       whatsappButton.addEventListener("click", function(e) {
-        handleWhatsAppClick(e, whatsappButton, "Bottom_WhatsApp_Button");
+        handleWhatsAppClick(
+          e,
+          whatsappButton,
+          "Bottom_WhatsApp_Button"
+        );
       });
     }
+
   </script>
 
 </body>
